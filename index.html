@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI 반응 이미지</title>
+    <style>
+        body {
+            position: relative;
+            background-color: white; /* 배경을 흰색으로 변경 */
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+        }
+        .image {
+            position: absolute;
+            transition: opacity 1s ease-out, transform 1s ease-out, filter 1s ease-out; /* 블러, 회전 트랜지션 추가 */
+            transform-origin: center;
+            filter: blur(10px); /* 초기 블러 효과 */
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // 랜덤한 PNG 이미지 배열
+        const images = ["1.png", "6.png", "7.png", "8.png", "9.png"];
+
+        function getRandomImage() {
+            return images[Math.floor(Math.random() * images.length)];
+        }
+
+        function getRandomX() {
+            return Math.random() * window.innerWidth;
+        }
+
+        function getRandomY() {
+            const centerY = window.innerHeight / 2; // 화면 중앙
+            const range = window.innerHeight * 0.2; // 중앙을 기준으로 위아래 ±20% 범위 내에서 생성
+            return centerY + (Math.random() * range * 2 - range); // 중앙을 중심으로 약간의 랜덤 배치
+        }
+
+        function getImageSize(velocity) {
+            return 50 + (velocity / 127) * 50; // 최소 50px, 최대 100px (velocity에 따라 크기 조절)
+        }
+
+        function createImage(velocity) {
+            const img = document.createElement("img");
+            img.src = getRandomImage();
+            img.classList.add("image");
+
+            img.style.left = `${getRandomX()}px`;
+            img.style.top = `${getRandomY()}px`; // Y축을 중앙 근처로 설정
+            img.style.opacity = 0;
+            const size = getImageSize(velocity);
+            img.style.width = `${size}px`; // 건반 세기에 따라 크기 조절
+            img.style.transform = `scale(0.5)`;
+            img.style.filter = "blur(10px)"; // 초기 블러 효과 적용
+
+            // 랜덤한 회전 방향 설정 (시계 방향 또는 반시계 방향)
+            const rotationDirection = Math.random() < 0.5 ? 360 : -360; // 50% 확률로 방향 결정
+
+            // 회전 애니메이션을 동적으로 생성 (30초에 한 바퀴 회전)
+            const rotateAnimation = `rotateEffect${rotationDirection}`;
+            const styleSheet = document.styleSheets[0];
+            styleSheet.insertRule(`
+                @keyframes ${rotateAnimation} {
+                    0% { transform: scale(1) rotate(0deg); }
+                    100% { transform: scale(1) rotate(${rotationDirection}deg); }
+                }
+            `, styleSheet.cssRules.length);
+
+            img.style.animation = `${rotateAnimation} 30s linear infinite`; // 30초 동안 회전
+
+            document.body.appendChild(img);
+
+            // 애니메이션 효과 (투명도 & 크기 & 블러 해제)
+            setTimeout(() => {
+                img.style.opacity = 1;
+                img.style.transform = `scale(1)`;
+                img.style.filter = "blur(0px)"; // 블러 해제
+            }, 10);
+
+            // ✅ 5초 후 블러 + 추가 회전하면서 사라지기
+            setTimeout(() => {
+                img.style.opacity = 0;
+                img.style.transform = `scale(1.2) rotate(${rotationDirection * 2}deg)`; // 2배 더 회전하며 사라짐
+                img.style.filter = "blur(10px)"; // 다시 블러 처리
+                setTimeout(() => img.remove(), 1000);
+            }, 5000);
+        }
+
+        // MIDI 입력 감지
+        function onMIDIMessage(event) {
+            const [command, note, velocity] = event.data;
+            if (command === 144 && velocity > 0) { // 키를 눌렀을 때
+                createImage(velocity);
+            }
+        }
+
+        // MIDI 장치 연결
+        function initMIDI() {
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess()
+                    .then(midiAccess => {
+                        midiAccess.inputs.forEach(input => {
+                            input.onmidimessage = onMIDIMessage;
+                        });
+                    })
+                    .catch(err => console.error("MIDI 접근 오류:", err));
+            } else {
+                alert("이 브라우저는 MIDI를 지원하지 않습니다.");
+            }
+        }
+
+        window.onload = initMIDI;
+    </script>
+</body>
+</html>
